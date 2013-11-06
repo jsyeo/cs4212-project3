@@ -1,0 +1,15 @@
+# mac files
+.DS_Store
+
+# vim files
+*~
+*.swp
+
+# ocamlbuild files
+_build
+*.native
+*.byte
+*.o
+*.cmo
+*.cmxa
+*.cma
