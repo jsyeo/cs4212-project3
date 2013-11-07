@@ -38,7 +38,7 @@ type ir3_exp =
 type ir3_stmt = 
 	| Label3 of label3
 	| IfStmt3 of ir3_exp * label3 
-	| GoTo3 of label3 
+	| Goto3 of label3 
 	| ReadStmt3 of id3
 	| PrintStmt3 of idc3
 	| AssignStmt3 of id3 * ir3_exp
@@ -153,7 +153,7 @@ let string_of_ir3_stmt (s:ir3_stmt):string =
     | IfStmt3 (e, l) -> 
 		print_tab() ^ "If(" ^ (string_of_ir3_exp e) 
 		^") goto " ^ (string_of_int l) ^";"
-	| GoTo3  (l) -> 
+	| Goto3  (l) -> 
 		print_tab() ^ "goto " ^ (string_of_int l) ^ ";"
 	| ReadStmt3 idc -> print_tab() ^ "readln(" ^ idc ^");"
 	| PrintStmt3 idc -> print_tab() 

@@ -205,7 +205,7 @@ let rec jlitestmts_to_IR3Stmts
 				let gotolabel = fresh_label() in
 				let endlabel =  fresh_label() in
 				let ifIR3 = (IfStmt3 (negatedExp, gotolabel)) in
-				let gotoEndIR3 = (GoTo3 endlabel) in 
+				let gotoEndIR3 = (Goto3 endlabel) in 
 				(exprvars@thenvars@elsevars,
 					exprstmts@(ifIR3::thenstmst)
 					@(gotoEndIR3::((Label3 gotolabel)::elsestmts))
@@ -221,7 +221,7 @@ let rec jlitestmts_to_IR3Stmts
 				let looplabel = fresh_label() in
 				let endlabel =  fresh_label() in
 				let ifIR3 = (IfStmt3 (expr3, endlabel)) in
-				let gotoLoopIR3 = (GoTo3 looplabel) in 
+				let gotoLoopIR3 = (Goto3 looplabel) in 
 				(exprvars@vars,
 					(Label3 looplabel::exprstmts)@(ifIR3::stmst)
 					@[gotoLoopIR3]@[(Label3 endlabel)]
