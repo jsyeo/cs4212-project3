@@ -61,7 +61,7 @@ type md_decl3 =
 	  localvars3:(var_decl3 list);
 	  ir3stmts:(ir3_stmt list) 
 	 }
-  
+
 (* Ocaml Tuple Type representing an IR3 class declaration *)
 (* ClassDecl -> class <cname> {<VarDecl>* <MdDecl>} *)	  
 type cdata3 = cname3 * (var_decl3 list)
