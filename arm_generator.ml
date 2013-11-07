@@ -122,5 +122,9 @@ let ir3_md_to_arm md =
 let ir3_to_arm (classes, mainmd, mdlist) =
   (* let _armmdlist = (List.concat (List.map ir3_md_to_arm mdlist)) in *)
   let armmaindata, armmainmdinstr = ir3_md_to_arm mainmd in
-  let data_dir = PseudoInstr ".data" in
-  [data_dir] @ armmaindata @ armmainmdinstr
+  (* arm directives *)
+  let datadir = PseudoInstr ".data" in
+  let textdir = PseudoInstr ".text" in
+  (* boilerplate to 'declare' main*)
+  let declmain = [PseudoInstr ".global main"; PseudoInstr ".type main, %function"] in
+  [datadir] @ armmaindata @ [textdir] @ declmain @ armmainmdinstr
