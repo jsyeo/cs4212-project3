@@ -108,13 +108,28 @@ let ir3_stmts_to_arm ir3stmts =
             (armdata, armlitinstr @ [ldinstr;blinstr]) :: aux rest
          | Label3 lbl ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: Label3"
+            let linstr = Label (string_of_int lbl) in
+			([], [linstr]) :: aux rest   
          | IfStmt3 (condexp, lbl) ->
-            (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: IfStmt3"
+            (* TODO: Vincent *)            
+			(* If false goto else; 
+			cmp v5,#0
+			moveq v5,#0
+			movne v5,#1
+			cmp v5,#0
+			beq .1
+			*)
+			let (condinstr, reg) = ir3_exp_to_arm condexp in
+			(*let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+			let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
+			let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
+			let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+			let beqinstr = B ("eq", (string_of_int lbl)) in
+			([], condinstr @ [cmpinstr; beqinstr]) :: aux rest
          | Goto3 lbl ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: Goto3"
+			let binstr = B ("", (string_of_int lbl)) in
+			([], [binstr]) :: aux rest
          | ReadStmt3 id3 ->
             (* Not compiling to arm *)
             failwith "Unhandled ir3stmt: ReadStmt3"
@@ -125,10 +140,14 @@ let ir3_stmts_to_arm ir3stmts =
             (arndata, arminstr @ [stinstr]) :: aux rest
          | AssignDeclStmt3 (typ, id3, exp) ->
             (* TODO: Vincent *)
+			(* This is not used in jlite_toir3.ml *)
             failwith "Unhandled ir3stmt: AssignDeclStmt3"
          | AssignFieldStmt3 (lhsexp, rhsexp) ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: AssignFieldStmt3"
+			let (lhsexpinstr, reglhs) = ir3_exp_to_arm lhsexp in
+			let (rhsexpinstr, regrhs) = ir3_exp_to_arm rhsexp in
+			let moveqinstr = MOV ("", false, reglhs, regrhs) in
+			([], lhsexpinstr @ rhsexpinstr @ [moveqinstr]) :: aux rest           
          | MdCallStmt3 exp ->
             (* TODO: JS *)
             failwith "Unhandled ir3stmt: MdCallStmt3"
