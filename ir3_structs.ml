@@ -13,7 +13,7 @@ open Jlite_structs
 (* Accesing such a type is done through the "match with" construct 
 	as can be seen in the code below *)
 	
-type ir3_op = Jlite_structs.jlite_op
+type ir3_op = jlite_op
 
 type id3 = string
 type cname3 = string

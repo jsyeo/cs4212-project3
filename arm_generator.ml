@@ -2,12 +2,14 @@ open Arm_structs
 
 open Ir3_structs
 
+open Jlite_structs
+
 open Printf
 
 (*
 Every ir3 language construct is converted into a pair of instruction lists.
 One containing the data section, another containing the instructions.
- *)
+*)
 
 (*
 HOF that makes fresh (labels|vars|regs|fruits) generators for DRY-ness.
@@ -30,7 +32,7 @@ let fresh_arg_reg = fresh_maker "a"
 let fresh_reg_var = fresh_maker "v"
 
 let idc3_to_arm_literal (idc:idc3)
-    : (arm_instr list * arm_instr list * string) =
+  : (arm_instr list * arm_instr list * string) =
   match idc with
   | StringLiteral3 s ->
      let l = fresh_label() in
@@ -61,23 +63,70 @@ let ir3_exp_to_arm ir3exp =
   let rec aux ir3exp =
     match ir3exp with
     | BinaryExp3 (op, idc1, idc2) ->
-       (*  begin *)
-       (*   (\* TODO: XY *\) *)
-       (*   let (arm1data,reg1),(arm2data,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in *)
-       (*   (\* TODO : If reg2 is a constant, use RSB instead *\) *)
-       (*   let armexprinstr = match op with *)
-       (*   | AritmeticOp "+" -> *)
-       (*      ADD ("", false, fresh_reg_var(), reg1, reg2) *)
-       (*   | AritmeticOp "-" -> *)
-       (*      SUB ("", false, fresh_reg_var(), reg1, reg2) *)
-       (*   | AritmeticOp "*" -> *)
-       (*      MUL ("", false, fresh_reg_var(), reg1, reg2) *)
-       (*   in *)
-       (*   (arm1data @ arm2data, armexprinstr) *)
-       (* end *)
-       failwith "Unhandled ir3exp: BinaryExp3"
-    | UnaryExp3 (op, idc) ->
        (* TODO: XY *)
+       begin
+        let (arm1data,arm1instr,reg1),(arm2data,arm2instr,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
+        let frv = fresh_reg_var() in
+        (* TODO : If reg2 is a constant, use RSB instead *)
+        let armexprinstr = match op with
+        | AritmeticOp "+" ->
+           [ADD ("", false, frv, reg1, RegOp reg2)]
+        | AritmeticOp "-" ->
+           [SUB ("", false, frv, reg1, RegOp reg2)]
+        | AritmeticOp "*" ->
+           [MUL ("", false, frv, reg1, reg2)]
+		| RelationalOp "<" ->
+		   (*
+		   	cmp a4,a3
+		    movlt v3,#1
+		    movge v3,#0
+		
+		    (a4 < a3)
+			*)
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("lt", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("ge", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+		| RelationalOp "<=" ->
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("le", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("gt", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+		|  RelationalOp ">" ->
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("gt", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("le", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+		| RelationalOp ">=" ->
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("ge", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("lt", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+		| RelationalOp "==" ->
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("eq", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("ne", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+		| RelationalOp "!=" ->
+		   let cmpinstr = CMP ("", reg1, reg2) in
+		   let movltinstr = MOV ("ne", false, frv, ImmedOp "#1") in
+		   let movgeinstr = MOV ("eq", false, frv, ImmedOp "#0") in
+		   [cmpinstr; movltinstr; movgeinstr]
+        | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types)"
+        in
+        (arm1data @ arm2data, arm1instr @ arm2instr @ armexprinstr, frv)
+      end
+    | UnaryExp3 (op, idc) ->
+        (* TODO: XY *)
+        begin
+          let armdata, armistr, reg = idc3_to_arm_literal idc in
+          let frv = fresh_reg_var() in
+          let armexprinstr = match op with
+          | UnaryOp "-" ->
+             [RSB ("", false, frv, reg, ImmedOp "#0")]
+          | UnaryOp "!" ->
+             [RSB ("", false, frv, reg, ImmedOp "#1")]
+        end
        failwith "Unhandled ir3exp: UnaryExp3"
     | FieldAccess3 (id1, id2) ->
        (* TODO: XY *)
@@ -120,25 +169,46 @@ let ir3_stmts_to_arm ir3stmts =
             end
          | Label3 lbl ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: Label3"
+            let linstr = Label (string_of_int lbl) in
+		    ([], [linstr]) :: aux rest   
          | IfStmt3 (condexp, lbl) ->
-            (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: IfStmt3"
+            (* TODO: Vincent *)            
+		    (* If false goto else; 
+		    cmp v5,#0
+		    moveq v5,#0
+		    movne v5,#1
+		    cmp v5,#0
+		    beq .1
+		    *)
+		    let (condinstr, reg) = ir3_exp_to_arm condexp in
+		    (*let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+		    let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
+		    let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
+		    let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+		    let beqinstr = B ("eq", (string_of_int lbl)) in
+		    ([], condinstr @ [cmpinstr; beqinstr]) :: aux rest
          | Goto3 lbl ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: Goto3"
+		    let binstr = B ("", (string_of_int lbl)) in
+		    ([], [binstr]) :: aux rest
          | ReadStmt3 id3 ->
             (* Not compiling to arm *)
             failwith "Unhandled ir3stmt: ReadStmt3"
          | AssignStmt3 (id3, exp) ->
-            (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: AssignStmt3"
+            let armdata,arminstr,reg = ir3_exp_to_arm exp in
+            let id3reg = (idc3_to_arm_literal id3) in
+            let stinstr = STR ("", "", id3reg, reg) in
+            (arndata, arminstr @ [stinstr]) :: aux rest
          | AssignDeclStmt3 (typ, id3, exp) ->
             (* TODO: Vincent *)
+		    (* This is not used in jlite_toir3.ml *)
             failwith "Unhandled ir3stmt: AssignDeclStmt3"
          | AssignFieldStmt3 (lhsexp, rhsexp) ->
             (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: AssignFieldStmt3"
+		    let (lhsexpinstr, reglhs) = ir3_exp_to_arm lhsexp in
+		    let (rhsexpinstr, regrhs) = ir3_exp_to_arm rhsexp in
+		    let moveqinstr = MOV ("", false, reglhs, regrhs) in
+		    ([], lhsexpinstr @ rhsexpinstr @ [moveqinstr]) :: aux rest           
          | MdCallStmt3 exp ->
             (* TODO: JS *)
             failwith "Unhandled ir3stmt: MdCallStmt3"
