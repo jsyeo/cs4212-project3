@@ -37,6 +37,7 @@ let idc3_to_arm_literal (idc:idc3)
      ([Label l; PseudoInstr (sprintf ".asciz \"%s\"" s)],[],l)
   | IntLiteral3 i ->
      (* TODO: JS *)
+     
      failwith "Unhandled idc3: IntLiteral3"
   | BoolLiteral3 b ->
      (* TODO: JS *)
@@ -49,20 +50,20 @@ let ir3_exp_to_arm ir3exp =
   let rec aux ir3exp =
     match ir3exp with
     | BinaryExp3 (op, idc1, idc2) ->
-       begin
-        (* TODO: XY *)
-        let (arm1data,reg1),(arm2data,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
-        (* TODO : If reg2 is a constant, use RSB instead *)
-        let armexprinstr = match op with
-        | AritmeticOp "+" ->
-           ADD ("", false, fresh_reg_var(), reg1, reg2)
-        | AritmeticOp "-" ->
-           SUB ("", false, fresh_reg_var(), reg1, reg2)
-        | AritmeticOp "*" ->
-           MUL ("", false, fresh_reg_var(), reg1, reg2)
-        in
-        (arm1data @ arm2data, armexprinstr)
-      end
+      (*  begin *)
+      (*   (\* TODO: XY *\) *)
+      (*   let (arm1data,reg1),(arm2data,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in *)
+      (*   (\* TODO : If reg2 is a constant, use RSB instead *\) *)
+      (*   let armexprinstr = match op with *)
+      (*   | AritmeticOp "+" -> *)
+      (*      ADD ("", false, fresh_reg_var(), reg1, reg2) *)
+      (*   | AritmeticOp "-" -> *)
+      (*      SUB ("", false, fresh_reg_var(), reg1, reg2) *)
+      (*   | AritmeticOp "*" -> *)
+      (*      MUL ("", false, fresh_reg_var(), reg1, reg2) *)
+      (*   in *)
+      (*   (arm1data @ arm2data, armexprinstr) *)
+      (* end *)
        failwith "Unhandled ir3exp: BinaryExp3"
     | UnaryExp3 (op, idc) ->
        (* TODO: XY *)
