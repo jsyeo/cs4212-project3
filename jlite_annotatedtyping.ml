@@ -425,7 +425,7 @@ let rec type_check_stmts
 			end
 		| PrintStmt e -> 
 			let (expr_type,exprnew) = 
-			 (type_check_expr p env classid e) in
+			  (type_check_expr p env classid e) in
 			begin
 			match expr_type with
 			| Unknown | ObjectT _ -> 
