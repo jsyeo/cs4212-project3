@@ -52,24 +52,33 @@ let ir3_exp_to_arm ir3exp =
   let rec aux ir3exp =
     match ir3exp with
     | BinaryExp3 (op, idc1, idc2) ->
+       (* TODO: XY *)
        begin
-        (* TODO: XY *)
         let (arm1data,arm1instr,reg1),(arm2data,arm2instr,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
         let frv = fresh_reg_var() in
         (* TODO : If reg2 is a constant, use RSB instead *)
         let armexprinstr = match op with
         | AritmeticOp "+" ->
-           ADD ("", false, frv, reg1, RegOp reg2)
+           [ADD ("", false, frv, reg1, RegOp reg2)]
         | AritmeticOp "-" ->
-           SUB ("", false, frv, reg1, RegOp reg2)
+           [SUB ("", false, frv, reg1, RegOp reg2)]
         | AritmeticOp "*" ->
-           MUL ("", false, frv, reg1, reg2)
-        | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types"
+           [MUL ("", false, frv, reg1, reg2)]
+        | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types)"
         in
-        (arm1data @ arm2data, armexprinstr, frv)
+        (arm1data @ arm2data, arm1instr @ arm2instr @ armexprinstr, frv)
       end
     | UnaryExp3 (op, idc) ->
-       (* TODO: XY *)
+        (* TODO: XY *)
+        begin
+          let armdata, armistr, reg = idc3_to_arm_literal idc in
+          let frv = fresh_reg_var() in
+          let armexprinstr = match op with
+          | UnaryOp "-" ->
+             [RSB ("", false, frv, reg, ImmedOp "#0")]
+          | UnaryOp "!" ->
+             [RSB ("", false, frv, reg, ImmedOp "#1")]
+        end
        failwith "Unhandled ir3exp: UnaryExp3"
     | FieldAccess3 (id1, id2) ->
        (* TODO: XY *)
