@@ -2,6 +2,8 @@ open Arm_structs
 
 open Ir3_structs
 
+open Jlite_structs
+
 open Printf
 
 (*
@@ -37,7 +39,8 @@ let idc3_to_arm_literal (idc:idc3)
      ([Label l; PseudoInstr (sprintf ".asciz \"%s\"" s)],[],l)
   | IntLiteral3 i ->
      (* TODO: JS *)
-     failwith "Unhandled idc3: IntLiteral3"
+     let frv = fresh_reg_var() in
+     ([],[MOV ("", false, frv, ImmedOp (string_of_int i))],frv)
   | BoolLiteral3 b ->
      (* TODO: JS *)
      failwith "Unhandled idc3: BoolLiteral3"
@@ -51,19 +54,20 @@ let ir3_exp_to_arm ir3exp =
     | BinaryExp3 (op, idc1, idc2) ->
        begin
         (* TODO: XY *)
-        let (arm1data,reg1),(arm2data,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
+        let (arm1data,arm1instr,reg1),(arm2data,arm2instr,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
+        let frv = fresh_reg_var() in
         (* TODO : If reg2 is a constant, use RSB instead *)
         let armexprinstr = match op with
         | AritmeticOp "+" ->
-           ADD ("", false, fresh_reg_var(), reg1, reg2)
+           ADD ("", false, frv, reg1, RegOp reg2)
         | AritmeticOp "-" ->
-           SUB ("", false, fresh_reg_var(), reg1, reg2)
+           SUB ("", false, frv, reg1, RegOp reg2)
         | AritmeticOp "*" ->
-           MUL ("", false, fresh_reg_var(), reg1, reg2)
+           MUL ("", false, frv, reg1, reg2)
+        | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types"
         in
-        (arm1data @ arm2data, armexprinstr)
+        (arm1data @ arm2data, armexprinstr, frv)
       end
-       failwith "Unhandled ir3exp: BinaryExp3"
     | UnaryExp3 (op, idc) ->
        (* TODO: XY *)
        failwith "Unhandled ir3exp: UnaryExp3"
@@ -106,8 +110,10 @@ let ir3_stmts_to_arm ir3stmts =
             (* Not compiling to arm *)
             failwith "Unhandled ir3stmt: ReadStmt3"
          | AssignStmt3 (id3, exp) ->
-            (* TODO: Vincent *)
-            failwith "Unhandled ir3stmt: AssignStmt3"
+            let armdata,arminstr,reg = ir3_exp_to_arm exp in
+            let id3reg = (idc3_to_arm_literal id3) in
+            let stinstr = STR ("", "", id3reg, reg) in
+            (arndata, arminstr @ [stinstr]) :: aux rest
          | AssignDeclStmt3 (typ, id3, exp) ->
             (* TODO: Vincent *)
             failwith "Unhandled ir3stmt: AssignDeclStmt3"
