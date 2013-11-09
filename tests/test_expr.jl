@@ -1,6 +1,8 @@
 class Main {
      void main(){
-         println("abc");
-         println(50);
+         Int a;
+
+         a = a + 3;
+         println(a);
      }
 }

@@ -203,9 +203,10 @@ let ir3_stmts_to_arm offsettbl ir3stmts =
          | AssignStmt3 (id3, exp) ->
             (* TODO: retrieve offset from tbl and store exp *)
             let armdata,arminstr,reg = ir3_exp_to_arm offsettbl exp in
-            let id3data, id3instr, id3reg = (idc3_to_arm_literal offsettbl (Var3 id3)) in (* TODO - Check whether this id3 wrapping is correct *)
-            let stinstr = STR ("", "", id3reg, Reg reg) in
-            (armdata @ id3data, arminstr @ id3instr @ [stinstr]) :: aux rest
+            let offset = Hashtbl.find offsettbl id3 in
+            let negoffset = - offset in
+            let stinstr = STR ("", "", reg, RegPreIndexed ("fp", negoffset, false)) in
+            (armdata, arminstr @ [stinstr]) :: aux rest
          | AssignDeclStmt3 (typ, id3, exp) ->
             (* TODO: Vincent *)
             (* This is not used in jlite_toir3.ml *)
