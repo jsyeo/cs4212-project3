@@ -71,21 +71,24 @@ let ir3_exp_to_arm ir3exp =
     | UnaryExp3 (op, idc) ->
         (* TODO: XY *)
         begin
-          let armdata, armistr, reg = idc3_to_arm_literal idc in
+          let armdata, arminstr, reg = idc3_to_arm_literal idc in
           let frv = fresh_reg_var() in
           let armexprinstr = match op with
           | UnaryOp "-" ->
              [RSB ("", false, frv, reg, ImmedOp "#0")]
           | UnaryOp "!" ->
              [RSB ("", false, frv, reg, ImmedOp "#1")]
+          | _ -> failwith "Typecheck fails in front, else won't reach here"
+          in
+          (armdata, arminstr @ armexprinstr, frv)
         end
-       failwith "Unhandled ir3exp: UnaryExp3"
     | FieldAccess3 (id1, id2) ->
        (* TODO: XY *)
        failwith "Unhandled ir3exp: FieldAccess3"
     | Idc3Expr idc ->
        (* TODO: XY *)
-       failwith "Unhandled ir3exp: Idc3Expr"
+       let armdata, arminstr, reg = idc3_to_arm_literal idc in
+       (armdata, arminstr, reg)
     | MdCall3 (id, idclist) ->
        (* TODO: XY *)
        failwith "Unhandled ir3exp: MdCall3"
