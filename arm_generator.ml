@@ -29,10 +29,12 @@ let fresh_arg_reg = fresh_maker "a"
 
 let fresh_reg_var = fresh_maker "v"
 
-let idc3_to_arm_literal idc =
+let idc3_to_arm_literal (idc:idc3)
+  : (arm_instr list * arm_instr list * string) =
   match idc with
   | StringLiteral3 s ->
-     ([Label (fresh_label()); PseudoInstr (sprintf ".asciz \"%s\"" s)],[])
+     let l = fresh_label() in
+     ([Label l; PseudoInstr (sprintf ".asciz \"%s\"" s)],[],l)
   | IntLiteral3 i ->
      (* TODO: JS *)
      failwith "Unhandled idc3: IntLiteral3"
@@ -47,7 +49,20 @@ let ir3_exp_to_arm ir3exp =
   let rec aux ir3exp =
     match ir3exp with
     | BinaryExp3 (op, idc1, idc2) ->
-       (* TODO: XY *)
+       begin
+        (* TODO: XY *)
+        let (arm1data,reg1),(arm2data,reg2) = (idc3_to_arm_literal idc1),(idc3_to_arm_literal idc2) in
+        (* TODO : If reg2 is a constant, use RSB instead *)
+        let armexprinstr = match op with
+        | AritmeticOp "+" ->
+           ADD ("", false, fresh_reg_var(), reg1, reg2)
+        | AritmeticOp "-" ->
+           SUB ("", false, fresh_reg_var(), reg1, reg2)
+        | AritmeticOp "*" ->
+           MUL ("", false, fresh_reg_var(), reg1, reg2)
+        in
+        (arm1data @ arm2data, armexprinstr)
+      end
        failwith "Unhandled ir3exp: BinaryExp3"
     | UnaryExp3 (op, idc) ->
        (* TODO: XY *)
@@ -74,8 +89,8 @@ let ir3_stmts_to_arm ir3stmts =
        begin
          match stmt with
          | PrintStmt3 idc ->
-            let armdata,armlitinstr = idc3_to_arm_literal idc in
-            let ldinstr = LDR ("", "", "a1", LabelAddr "=L1") in
+            let armdata,armlitinstr,lbl = idc3_to_arm_literal idc in
+            let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
             let blinstr = BL ("", "printf(PLT)") in
             (armdata, armlitinstr @ [ldinstr;blinstr]) :: aux rest
          | Label3 lbl ->
