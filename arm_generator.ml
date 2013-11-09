@@ -75,43 +75,43 @@ let ir3_exp_to_arm ir3exp =
            [SUB ("", false, frv, reg1, RegOp reg2)]
         | AritmeticOp "*" ->
            [MUL ("", false, frv, reg1, reg2)]
-		| RelationalOp "<" ->
-		   (*
-		   	cmp a4,a3
-		    movlt v3,#1
-		    movge v3,#0
-		
-		    (a4 < a3)
-			*)
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("lt", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("ge", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
-		| RelationalOp "<=" ->
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("le", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("gt", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
-		|  RelationalOp ">" ->
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("gt", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("le", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
-		| RelationalOp ">=" ->
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("ge", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("lt", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
-		| RelationalOp "==" ->
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("eq", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("ne", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
-		| RelationalOp "!=" ->
-		   let cmpinstr = CMP ("", reg1, reg2) in
-		   let movltinstr = MOV ("ne", false, frv, ImmedOp "#1") in
-		   let movgeinstr = MOV ("eq", false, frv, ImmedOp "#0") in
-		   [cmpinstr; movltinstr; movgeinstr]
+    | RelationalOp "<" ->
+       (*
+        cmp a4,a3
+        movlt v3,#1
+        movge v3,#0
+    
+        (a4 < a3)
+      *)
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("lt", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("ge", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
+    | RelationalOp "<=" ->
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("le", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("gt", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
+    |  RelationalOp ">" ->
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("gt", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("le", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
+    | RelationalOp ">=" ->
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("ge", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("lt", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
+    | RelationalOp "==" ->
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("eq", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("ne", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
+    | RelationalOp "!=" ->
+       let cmpinstr = CMP ("", reg1, RegOp reg2) in
+       let movltinstr = MOV ("ne", false, frv, ImmedOp "#1") in
+       let movgeinstr = MOV ("eq", false, frv, ImmedOp "#0") in
+       [cmpinstr; movltinstr; movgeinstr]
         | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types)"
         in
         (arm1data @ arm2data, arm1instr @ arm2instr @ armexprinstr, frv)
@@ -119,21 +119,24 @@ let ir3_exp_to_arm ir3exp =
     | UnaryExp3 (op, idc) ->
         (* TODO: XY *)
         begin
-          let armdata, armistr, reg = idc3_to_arm_literal idc in
+          let armdata, arminstr, reg = idc3_to_arm_literal idc in
           let frv = fresh_reg_var() in
           let armexprinstr = match op with
           | UnaryOp "-" ->
              [RSB ("", false, frv, reg, ImmedOp "#0")]
           | UnaryOp "!" ->
              [RSB ("", false, frv, reg, ImmedOp "#1")]
+          | _ -> failwith "Typecheck fails in front, else won't reach here"
+          in
+          (armdata, arminstr @ armexprinstr, frv)
         end
-       failwith "Unhandled ir3exp: UnaryExp3"
     | FieldAccess3 (id1, id2) ->
        (* TODO: XY *)
        failwith "Unhandled ir3exp: FieldAccess3"
     | Idc3Expr idc ->
        (* TODO: XY *)
-       failwith "Unhandled ir3exp: Idc3Expr"
+       let armdata, arminstr, reg = idc3_to_arm_literal idc in
+       (armdata, arminstr, reg)
     | MdCall3 (id, idclist) ->
        (* TODO: XY *)
        failwith "Unhandled ir3exp: MdCall3"
@@ -170,45 +173,45 @@ let ir3_stmts_to_arm ir3stmts =
          | Label3 lbl ->
             (* TODO: Vincent *)
             let linstr = Label (string_of_int lbl) in
-		    ([], [linstr]) :: aux rest   
+        ([], [linstr]) :: aux rest   
          | IfStmt3 (condexp, lbl) ->
             (* TODO: Vincent *)            
-		    (* If false goto else; 
-		    cmp v5,#0
-		    moveq v5,#0
-		    movne v5,#1
-		    cmp v5,#0
-		    beq .1
-		    *)
-		    let (condinstr, reg) = ir3_exp_to_arm condexp in
-		    (*let cmpinstr = CMP ("", reg, ImmedOp "#0") in
-		    let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
-		    let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
-		    let cmpinstr = CMP ("", reg, ImmedOp "#0") in
-		    let beqinstr = B ("eq", (string_of_int lbl)) in
-		    ([], condinstr @ [cmpinstr; beqinstr]) :: aux rest
+            (* If false goto else; 
+            cmp v5,#0
+            moveq v5,#0
+            movne v5,#1
+            cmp v5,#0
+            beq .1
+            *)
+            let (conddata, condinstr, reg) = ir3_exp_to_arm condexp in
+            (*let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+            let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
+            let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
+            let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+            let beqinstr = B ("eq", (string_of_int lbl)) in
+            (conddata, condinstr @ [cmpinstr; beqinstr]) :: aux rest
          | Goto3 lbl ->
             (* TODO: Vincent *)
-		    let binstr = B ("", (string_of_int lbl)) in
-		    ([], [binstr]) :: aux rest
+            let binstr = B ("", (string_of_int lbl)) in
+            ([], [binstr]) :: aux rest
          | ReadStmt3 id3 ->
             (* Not compiling to arm *)
             failwith "Unhandled ir3stmt: ReadStmt3"
          | AssignStmt3 (id3, exp) ->
             let armdata,arminstr,reg = ir3_exp_to_arm exp in
-            let id3reg = (idc3_to_arm_literal id3) in
-            let stinstr = STR ("", "", id3reg, reg) in
-            (arndata, arminstr @ [stinstr]) :: aux rest
+            let id3data, id3instr, id3reg = (idc3_to_arm_literal (Var3 id3)) in (* TODO - Check whether this id3 wrapping is correct *)
+            let stinstr = STR ("", "", id3reg, Reg reg) in
+            (armdata @ id3data, arminstr @ id3instr @ [stinstr]) :: aux rest
          | AssignDeclStmt3 (typ, id3, exp) ->
             (* TODO: Vincent *)
-		    (* This is not used in jlite_toir3.ml *)
+            (* This is not used in jlite_toir3.ml *)
             failwith "Unhandled ir3stmt: AssignDeclStmt3"
          | AssignFieldStmt3 (lhsexp, rhsexp) ->
             (* TODO: Vincent *)
-		    let (lhsexpinstr, reglhs) = ir3_exp_to_arm lhsexp in
-		    let (rhsexpinstr, regrhs) = ir3_exp_to_arm rhsexp in
-		    let moveqinstr = MOV ("", false, reglhs, regrhs) in
-		    ([], lhsexpinstr @ rhsexpinstr @ [moveqinstr]) :: aux rest           
+            let (lhsexpdata, lhsexpinstr, reglhs) = ir3_exp_to_arm lhsexp in
+            let (rhsexpdata, rhsexpinstr, regrhs) = ir3_exp_to_arm rhsexp in
+            let moveqinstr = MOV ("", false, reglhs, RegOp regrhs) in
+            (lhsexpdata @ rhsexpdata, lhsexpinstr @ rhsexpinstr @ [moveqinstr]) :: aux rest           
          | MdCallStmt3 exp ->
             (* TODO: JS *)
             failwith "Unhandled ir3stmt: MdCallStmt3"
