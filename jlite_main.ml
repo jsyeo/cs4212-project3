@@ -14,7 +14,7 @@ let (@@) f x = f x
 
 let source_files = ref []
 
-let usage_msg = Sys.argv.(1) ^ " <source files>"
+let usage_msg = Sys.argv.(0) ^ " <source files>"
 
 let set_source_file arg = source_files := arg :: !source_files
 
