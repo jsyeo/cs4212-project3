@@ -18,13 +18,12 @@ let usage_msg = Sys.argv.(0) ^ " <source files>"
 
 let set_source_file arg = source_files := arg :: !source_files
 
+let print_all = ref false
+
 let parse_file file_name =
   let org_in_chnl = open_in file_name in
   let lexbuf = Lexing.from_channel org_in_chnl in
   try
-    print_string "Parsing...\n" ;
-    print_string file_name ;
-    print_string "\n" ;
     let prog =  Jlite_parser.input (Jlite_lexer.token file_name) lexbuf in
     close_in org_in_chnl;
     prog
@@ -33,18 +32,27 @@ let parse_file file_name =
 
 let process file_name prog  =
   begin
-    print_string @@ Jlite_structs.string_of_jlite_program prog;
-    let typedprog = (Jlite_annotatedtyping.type_check_jlite_program prog) in
-    print_string @@ Jlite_structs.string_of_jlite_program typedprog;
+    let typedprog = Jlite_annotatedtyping.type_check_jlite_program prog in
     let ir3prog = Jlite_toir3.jlite_program_to_IR3 typedprog in
-    print_string @@ Ir3_structs.string_of_ir3_program ir3prog;
     let armprog = Arm_generator.ir3_to_arm ir3prog in
-    print_string @@ Arm_structs.string_of_arm_prog armprog;
+    let _ =
+      if !print_all then
+        let _ = print_string @@ Jlite_structs.string_of_jlite_program prog in
+        let _ = print_string @@ Jlite_structs.string_of_jlite_program typedprog in
+        let _ = print_string @@ Ir3_structs.string_of_ir3_program ir3prog in
+        let _ = print_string @@ Arm_structs.string_of_arm_prog armprog in
+        ()
+      else
+        let _ = print_string @@ Arm_structs.string_of_arm_prog armprog in
+        () in
+    ()
   end
 
 let _ =
   begin
-    Arg.parse [] set_source_file usage_msg ;
+    Arg.parse [
+      ("-a", Arg.Unit (fun () -> print_all := true), "Prints the typed program, ir3 immediate form and the arm assembly.")
+    ] set_source_file usage_msg ;
     match !source_files with
     | [] -> print_string "No file provided \n"
     | x::_->
