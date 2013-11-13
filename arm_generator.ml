@@ -36,7 +36,9 @@ let idc3_to_arm_literal offsettbl (idc:idc3)
   match idc with
   | StringLiteral3 s ->
     let l = fresh_label() in
-    ([Label l; PseudoInstr (sprintf ".asciz \"%s\"" s)],[],l)
+    let r = fresh_reg_var() in
+    let ldinstr = LDR ("", "", r, LabelAddr ("="^l)) in
+    ([Label l; PseudoInstr (sprintf ".asciz \"%s\"" s)],[ldinstr],r)
   | IntLiteral3 i ->
      (* TODO: JS *)
     if i < 256 then
@@ -154,6 +156,13 @@ let ir3_exp_to_arm clstbl offsettbl ir3exp =
       (armdata, arminstr, reg)
     | MdCall3 (id, idclist) ->
        (* TODO: XY *)
+      (* let paramscount = List.length idclist in *)
+      (* let subspinstr = SUB ("", false, "sp", "sp", ImmedOp ("#" ^ (string_of_int (paramscount * 4)))) in *)
+      (* let rec push_params_to_stack count idclist datalist instrlist = *)
+      (*   match idclist with *)
+      (*   | [] -> (datalist, instrlist) *)
+      (*   | idc3 :: rest -> *)
+      (*     let (idc3data, idc3instr, idc3res) = idc3_to_arm_literal offsettbl idc3 in *)          
       failwith "Unhandled ir3exp: MdCall3"
     | ObjectCreate3 cname ->
       (* TODO: XY *)
@@ -174,46 +183,41 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
       begin
         match stmt with
         | PrintStmt3 idc ->
-          let gen_print_reg_instrs idc =
+          let gen_print_reg_instrs fmt idc =
             let armdata,armlitinstr,reg = idc3_to_arm_literal offsettbl idc in
             let lbl = fresh_label() in
-            let formatdata = [Label lbl; PseudoInstr (".asciz \"%d\"")] in
+            let formatdata = [Label lbl; PseudoInstr (".asciz "^ fmt)] in
             let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
             let movinstr = MOV ("", false, "a2", RegOp reg) in
             let blinstr = BL ("", "printf(PLT)") in
             (armdata @ formatdata, armlitinstr @ [ldinstr; movinstr; blinstr]) in
-          let gen_print_lbl_instrs idc =
-            let armdata,armlitinstr,lbl = idc3_to_arm_literal offsettbl idc in
-            let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
-            let blinstr = BL ("", "printf(PLT)") in
-            (armdata, armlitinstr @ [ldinstr;blinstr]) in
-            begin
-              match idc with
-              | IntLiteral3 _
-              | BoolLiteral3 _ ->
-                gen_print_reg_instrs idc :: aux rest
-              | StringLiteral3 _ ->
-                gen_print_lbl_instrs idc :: aux rest
-              | Var3 id ->
-                let armdata,armlitinstr,reg = idc3_to_arm_literal offsettbl idc in
-                let _, typ = Hashtbl.find offsettbl id in
-                begin
-                  match typ with
-                  | IntT
-                  | BoolT ->	
-                    let lbl = fresh_label() in
-                    let formatdata = [Label lbl; PseudoInstr (".asciz \"%d\"")] in
-                    let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
-                    let movinstr = MOV ("", false, "a2", RegOp reg) in
-                    let blinstr = BL ("", "printf(PLT)") in
-                    (armdata @ formatdata, armlitinstr @ [ldinstr; movinstr; blinstr]) :: aux rest
-                  | StringT ->
-                    let movinstr = MOV ("", false, "a1", RegOp reg) in
-                    let blinstr = BL ("", "printf(PLT)") in
-                    (armdata, armlitinstr @ [movinstr;blinstr]) :: aux rest
-                  | _ -> failwith "Can't print Object types. WHUT? YOU MAD BRO?"
-                end
-            end
+          begin
+            match idc with
+            | IntLiteral3 _
+            | BoolLiteral3 _ ->
+              gen_print_reg_instrs "\"%d\"" idc :: aux rest
+            | StringLiteral3 _ ->
+              gen_print_reg_instrs "\"%s\"" idc :: aux rest
+            | Var3 id ->
+              let armdata,armlitinstr,reg = idc3_to_arm_literal offsettbl idc in
+              let _, typ = Hashtbl.find offsettbl id in
+              begin
+                match typ with
+                | IntT
+                | BoolT ->	
+                  let lbl = fresh_label() in
+                  let formatdata = [Label lbl; PseudoInstr (".asciz \"%d\"")] in
+                  let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
+                  let movinstr = MOV ("", false, "a2", RegOp reg) in
+                  let blinstr = BL ("", "printf(PLT)") in
+                  (armdata @ formatdata, armlitinstr @ [ldinstr; movinstr; blinstr]) :: aux rest
+                | StringT ->
+                  let movinstr = MOV ("", false, "a1", RegOp reg) in
+                  let blinstr = BL ("", "printf(PLT)") in
+                  (armdata, armlitinstr @ [movinstr;blinstr]) :: aux rest
+                | _ -> failwith "Can't print Object types. WHUT? YOU MAD BRO?"
+              end
+          end
         | Label3 lbl ->
           (* TODO: Vincent *)
           let linstr = Label (string_of_int lbl) in
@@ -246,18 +250,8 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
           let armdata,arminstr,res = ir3_exp_to_arm clstbl offsettbl exp in
           (* res can be either reg or lable >_< *)
           let (offset, typ) = Hashtbl.find offsettbl id3 in
-          begin
-            match typ with
-            | StringT ->
-              let r = fresh_reg_var() in
-              let ldrinstr = LDR ("", "", r, LabelAddr ("=" ^ res)) in
-              let stinstr = STR ("", "", r, RegPreIndexed ("fp", offset, false)) in
-              (armdata, arminstr @ [ldrinstr;stinstr]) :: aux rest
-            | _ ->
-              let stinstr = STR ("", "", res, RegPreIndexed ("fp", offset, false)) in
-              (armdata, arminstr @ [stinstr]) :: aux rest
-          end
-
+          let stinstr = STR ("", "", res, RegPreIndexed ("fp", offset, false)) in
+          (armdata, arminstr @ [stinstr]) :: aux rest
         | AssignDeclStmt3 (typ, id3, exp) ->
           (* TODO: Vincent *)
           (* This is not used in jlite_toir3.ml *)
