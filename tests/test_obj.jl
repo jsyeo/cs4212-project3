@@ -1,11 +1,9 @@
 class Main {
     void main() {
         Foo f;
-        Int i;
-        i = 1;
         f = new Foo();
-        i = f.b;
-        println(i);
+        f.b = 78;
+        println(f.b);
     }
 }
 

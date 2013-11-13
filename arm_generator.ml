@@ -58,8 +58,7 @@ let idc3_to_arm_literal offsettbl (idc:idc3)
   | Var3 id3 ->
     let r = fresh_reg_var() in
     let (offset, _) = Hashtbl.find offsettbl id3 in
-    let negoffset = - offset in
-    let ldrinstr = LDR ("", "", r, RegPreIndexed ("fp", negoffset, false)) in
+    let ldrinstr = LDR ("", "", r, RegPreIndexed ("fp", offset, false)) in
     ([],[ldrinstr],r)
 
 let ir3_exp_to_arm clstbl offsettbl ir3exp =
@@ -141,9 +140,8 @@ let ir3_exp_to_arm clstbl offsettbl ir3exp =
         | ObjectT typ ->
           let varstbl = Hashtbl.find clstbl typ in
           let id2offset = Hashtbl.find varstbl id2 in
-          let negoffset = - offset in
           let r = fresh_reg_var() in
-          let ldid1instr = LDR ("", "", r, RegPreIndexed ("fp", negoffset, false)) in
+          let ldid1instr = LDR ("", "", r, RegPreIndexed ("fp", offset, false)) in
            (* TODO : Check whether using the same register is correct *)
           let ldid2instr = LDR ("", "", r, RegPreIndexed (r, id2offset, false)) in
           ([], [ldid1instr; ldid2instr], r)
@@ -253,12 +251,10 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
             | StringT ->
               let r = fresh_reg_var() in
               let ldrinstr = LDR ("", "", r, LabelAddr ("=" ^ res)) in
-              let negoffset = - offset in
-              let stinstr = STR ("", "", r, RegPreIndexed ("fp", negoffset, false)) in
+              let stinstr = STR ("", "", r, RegPreIndexed ("fp", offset, false)) in
               (armdata, arminstr @ [ldrinstr;stinstr]) :: aux rest
             | _ ->
-              let negoffset = - offset in
-              let stinstr = STR ("", "", res, RegPreIndexed ("fp", negoffset, false)) in
+              let stinstr = STR ("", "", res, RegPreIndexed ("fp", offset, false)) in
               (armdata, arminstr @ [stinstr]) :: aux rest
           end
 
@@ -268,10 +264,27 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
           failwith "Unhandled ir3stmt: AssignDeclStmt3"
         | AssignFieldStmt3 (lhsexp, rhsexp) ->
           (* TODO: Vincent *)
-          let (lhsexpdata, lhsexpinstr, reglhs) = ir3_exp_to_arm clstbl offsettbl lhsexp in
-          let (rhsexpdata, rhsexpinstr, regrhs) = ir3_exp_to_arm clstbl offsettbl rhsexp in
-          let moveqinstr = MOV ("", false, reglhs, RegOp regrhs) in
-          (lhsexpdata @ rhsexpdata, lhsexpinstr @ rhsexpinstr @ [moveqinstr]) :: aux rest           
+          begin
+            match lhsexp with
+            | FieldAccess3 (id1, id2) ->
+              let (offset, objtyp) = Hashtbl.find offsettbl id1 in
+              let typ =
+                match objtyp with
+                | ObjectT t -> t
+                | _ -> failwith "LOL" in
+              let varstbl = Hashtbl.find clstbl typ in
+              let id2offset = Hashtbl.find varstbl id2 in
+              let (rhsexpdata, rhsexpinstr, regrhs) = ir3_exp_to_arm clstbl offsettbl rhsexp in
+              let r = fresh_reg_var() in
+
+              let ldid1instr = LDR ("", "", r, RegPreIndexed ("fp", offset, false)) in
+              (* TODO : Check whether using the same register is correct *)              
+
+              let strinstr = STR ("", "", regrhs, RegPreIndexed (r
+, id2offset, false)) in
+              (rhsexpdata, rhsexpinstr @ [ldid1instr; strinstr]) :: aux rest
+            | _ -> failwith "IR3 generation failed in front, shouldn't reach this point"
+          end
         | MdCallStmt3 exp ->
           (* TODO: JS *)
           failwith "Unhandled ir3stmt: MdCallStmt3"
@@ -293,13 +306,22 @@ let ir3_md_to_arm clstbl md =
   (* sub sp, sp, #(numlocals * 4) *)
   let allocstack = SUB ("", false, "sp", "sp", ImmedOp ("#" ^ string_of_int (numlocals * 4))) in
   let offsettbl = Hashtbl.create numlocals in
-  let rec pop_tbl count locals =
+  let rec pop_tbl_locals count locals =
     match locals with
     | [] -> ()
     | (typ, id) :: rest ->
-      Hashtbl.add offsettbl id (((numlocals - count) * 4 + 24), typ);
-      pop_tbl (count + 1) rest in
-  let _ = pop_tbl 0 md.localvars3 in
+      let negoffset = - ((numlocals - count) * 4 + 24) in
+      Hashtbl.add offsettbl id (negoffset, typ);
+      pop_tbl_locals (count + 1) rest in
+  let _ = pop_tbl_locals 0 md.localvars3 in
+  let rec pop_tbl_params count params =
+    match params with
+    | [] -> ()
+    | (typ, id) :: rest ->
+      let offset = count * 4 in
+      Hashtbl.add offsettbl id (offset, typ);
+      pop_tbl_params (count + 1) rest in
+  let _ = pop_tbl_params 1 md.params3 in
   let restoresp = SUB ("", false, "sp", "fp", ImmedOp ("#24")) in
   let ldminstr = LDMFD ["v1-v5";"fp";"pc"] in
   let armdata, arminstr = List.split (ir3_stmts_to_arm clstbl offsettbl md.ir3stmts) in
