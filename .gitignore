@@ -13,3 +13,6 @@ _build
 *.cmo
 *.cmxa
 *.cma
+
+# generated asm files
+tests/*.s
