@@ -156,14 +156,18 @@ let ir3_exp_to_arm clstbl offsettbl ir3exp =
       (armdata, arminstr, reg)
     | MdCall3 (id, idclist) ->
        (* TODO: XY *)
-      (* let paramscount = List.length idclist in *)
-      (* let subspinstr = SUB ("", false, "sp", "sp", ImmedOp ("#" ^ (string_of_int (paramscount * 4)))) in *)
-      (* let rec push_params_to_stack count idclist datalist instrlist = *)
-      (*   match idclist with *)
-      (*   | [] -> (datalist, instrlist) *)
-      (*   | idc3 :: rest -> *)
-      (*     let (idc3data, idc3instr, idc3res) = idc3_to_arm_literal offsettbl idc3 in *)          
-      failwith "Unhandled ir3exp: MdCall3"
+      let paramscount = List.length idclist in
+      let subspinstr = SUB ("", false, "sp", "sp", ImmedOp ("#" ^ (string_of_int (paramscount * 4)))) in
+      let rec push_params_to_stack count idclist datalist instrlist =
+        match idclist with
+        | [] -> (datalist, instrlist)
+        | idc3 :: rest ->
+          let (idc3data, idc3instr, idc3reg) = idc3_to_arm_literal offsettbl idc3 in    
+          let strinstr = STR ("", "", idc3reg, RegPreIndexed ("sp", count*4, false)) in
+          push_params_to_stack (count+1) rest (idc3data @ datalist) (idc3instr @ [strinstr] @ instrlist) in
+      let datalist, instrlist = push_params_to_stack 0 idclist [] [] in
+      let binstr = BL ("", id) in
+      (datalist, [subspinstr] @ instrlist @ [binstr], "a1")
     | ObjectCreate3 cname ->
       (* TODO: XY *)
       let varstbl = Hashtbl.find clstbl cname in
@@ -195,28 +199,26 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
             match idc with
             | IntLiteral3 _
             | BoolLiteral3 _ ->
-              gen_print_reg_instrs "\"%d\"" idc :: aux rest
+              gen_print_reg_instrs "\"%d\\n\"" idc :: aux rest
             | StringLiteral3 _ ->
-              gen_print_reg_instrs "\"%s\"" idc :: aux rest
+              gen_print_reg_instrs "\"%s\\n\"" idc :: aux rest
             | Var3 id ->
               let armdata,armlitinstr,reg = idc3_to_arm_literal offsettbl idc in
               let _, typ = Hashtbl.find offsettbl id in
-              begin
+              let fmt =
                 match typ with
                 | IntT
-                | BoolT ->	
-                  let lbl = fresh_label() in
-                  let formatdata = [Label lbl; PseudoInstr (".asciz \"%d\"")] in
-                  let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
-                  let movinstr = MOV ("", false, "a2", RegOp reg) in
-                  let blinstr = BL ("", "printf(PLT)") in
-                  (armdata @ formatdata, armlitinstr @ [ldinstr; movinstr; blinstr]) :: aux rest
+                | BoolT ->
+                  "\"%d\\n\""
                 | StringT ->
-                  let movinstr = MOV ("", false, "a1", RegOp reg) in
-                  let blinstr = BL ("", "printf(PLT)") in
-                  (armdata, armlitinstr @ [movinstr;blinstr]) :: aux rest
-                | _ -> failwith "Can't print Object types. WHUT? YOU MAD BRO?"
-              end
+                  "\"%s\\n\""
+                | _ -> failwith "Can't print Object types. WHUT? YOU MAD BRO?" in
+              let lbl = fresh_label() in
+              let formatdata = [Label lbl; PseudoInstr (".asciz " ^ fmt)] in
+              let ldinstr = LDR ("", "", "a1", LabelAddr ("="^lbl)) in
+              let movinstr = MOV ("", false, "a2", RegOp reg) in
+              let blinstr = BL ("", "printf(PLT)") in
+              (armdata @ formatdata, armlitinstr @ [ldinstr; movinstr; blinstr]) :: aux rest
           end
         | Label3 lbl ->
           (* TODO: Vincent *)
@@ -281,16 +283,19 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
           end
         | MdCallStmt3 exp ->
           (* TODO: JS *)
-          failwith "Unhandled ir3stmt: MdCallStmt3"
+          let mdcalldata, mdcallinstr, _ = ir3_exp_to_arm clstbl offsettbl exp in
+          (mdcalldata, mdcallinstr) :: aux rest
         | ReturnStmt3 id3 ->
-          (* TODO: JS *)
-          failwith "Unhandled ir3stmt: ReturnStmt3"
+          let (offset, _) = Hashtbl.find offsettbl id3 in
+          let ldrinstr = LDR ("", "", "a1", RegPreIndexed ("fp", offset, false)) in
+          ([], [ldrinstr]) :: aux rest
         | ReturnVoidStmt3 ->
           (* TODO: JS *)
-          failwith "Unhandled ir3stmt: ReturnVoidStmt3"
+          ([],[]) :: aux rest
       end in
       aux ir3stmts
 
+        
 
 let ir3_md_to_arm clstbl md =
   let numlocals = List.length md.localvars3 in
@@ -333,11 +338,12 @@ let ir3_to_arm (classes, mainmd, mdlist) =
 	  Hashtbl.add varstbl id (!count * 4);
 	  count := !count + 1) vardecls in
       Hashtbl.add clstbl cname varstbl) classes in
-  (* let _armmdlist = (List.concat (List.map ir3_md_to_arm mdlist)) in *)
+  let armmdlistdata, armmdlistinstr = List.split (List.map (ir3_md_to_arm clstbl) mdlist) in
+  let armmdlistdata, armmdlistinstr = (List.concat armmdlistdata), (List.concat armmdlistinstr) in
   let armmaindata, armmainmdinstr = ir3_md_to_arm clstbl mainmd in
   (* arm directives *)
   let datadir = PseudoInstr ".data" in
   let textdir = PseudoInstr ".text" in
   (* boilerplate to 'declare' main*)
   let declmain = [PseudoInstr ".global main"; PseudoInstr ".type main, %function"] in
-  [datadir] @ armmaindata @ [textdir] @ declmain @ armmainmdinstr
+  [datadir] @ armmdlistdata @ armmaindata @ [textdir] @ declmain @ armmdlistinstr @ armmainmdinstr
