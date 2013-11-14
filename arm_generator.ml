@@ -252,7 +252,7 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
           (*let cmpinstr = CMP ("", reg, ImmedOp "#0") in
             let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
             let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
-          let cmpinstr = CMP ("", reg, ImmedOp "#0") in
+          let cmpinstr = CMP ("", reg, ImmedOp "#1") in
           let beqinstr = B ("eq", "." ^ (string_of_int lbl)) in
           (conddata, condinstr @ [cmpinstr; beqinstr]) :: aux rest
         | Goto3 lbl ->
