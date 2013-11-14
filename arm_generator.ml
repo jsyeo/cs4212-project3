@@ -116,6 +116,21 @@ let ir3_exp_to_arm clstbl offsettbl ir3exp =
 	    let movltinstr = MOV ("ne", false, frv, ImmedOp "#1") in
 	    let movgeinstr = MOV ("eq", false, frv, ImmedOp "#0") in
 	    [cmpinstr; movltinstr; movgeinstr]
+          | BooleanOp "&&" ->
+            let cmpinstr = CMP ("", reg1, RegOp reg2) in
+            let moveqinstr = MOV ("eq", false, frv, ImmedOp "#1") in
+            let movneinstr = MOV ("ne", false, frv, ImmedOp "#0") in
+            let cmpreginstr = CMP ("eq", reg1, ImmedOp "#1") in
+            let movneinstr2 = MOV ("ne", false, frv, ImmedOp "#0") in
+            [cmpinstr; moveqinstr; movneinstr; cmpreginstr; movneinstr2]
+          | BooleanOp "||" ->
+            (* All registers are boolean values *)
+            let movinstr = MOV ("", false, frv, ImmedOp "#0") in
+            let cmpr1instr = CMP ("", reg1, ImmedOp "#1") in
+            let moveqinstr = MOV ("eq", false, frv, ImmedOp "#1") in
+            let cmpr2instr = CMP ("", reg2, ImmedOp "#1") in
+            let moveqinstr2 = MOV ("eq", false, frv, ImmedOp "#1") in
+            [movinstr; cmpr1instr; moveqinstr; cmpr2instr; moveqinstr2]
           | _ -> failwith "Unhandled ir3exp: BinaryExp3 (other types)"
         in
         (arm1data @ arm2data, arm1instr @ arm2instr @ armexprinstr, frv)
@@ -222,7 +237,7 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
           end
         | Label3 lbl ->
           (* TODO: Vincent *)
-          let linstr = Label (string_of_int lbl) in
+          let linstr = Label ("." ^ (string_of_int lbl)) in
           ([], [linstr]) :: aux rest   
         | IfStmt3 (condexp, lbl) ->
           (* TODO: Vincent *)            
@@ -238,11 +253,11 @@ let ir3_stmts_to_arm clstbl offsettbl ir3stmts =
             let moveqinstr = MOV ("eq", false, reg, ImmedOp "#0") in
             let movneinstr = MOV ("ne", false, reg, ImmedOp "#1") in*)
           let cmpinstr = CMP ("", reg, ImmedOp "#0") in
-          let beqinstr = B ("eq", (string_of_int lbl)) in
+          let beqinstr = B ("eq", "." ^ (string_of_int lbl)) in
           (conddata, condinstr @ [cmpinstr; beqinstr]) :: aux rest
         | Goto3 lbl ->
           (* TODO: Vincent *)
-          let binstr = B ("", (string_of_int lbl)) in
+          let binstr = B ("", "." ^ (string_of_int lbl)) in
           ([], [binstr]) :: aux rest
         | ReadStmt3 id3 ->
           (* Not compiling to arm *)
