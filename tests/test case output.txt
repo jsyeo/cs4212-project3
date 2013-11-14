@@ -1,0 +1,76 @@
+### Start of testing ###
+Assumption is made that println works.
+
+testing AritmeticOp
+2
+3
+5
+15
+5
+-1
+15
+0
+1
+Here we will test if f will be changed to 2.
+2
+
+Lets check boolean now.
+true
+false
+testing RelationalOp
+true
+false
+false
+true
+true
+true
+false
+false
+true
+testing UnaryExp3
+false
+true
+true
+false
+
+testing of objects
+testing AssignFieldStmt and FieldAccess
+5
+true
+class A string
+7
+I don't know what else to test
+I am testing alot things at the same time.
+
+Let test methods now
+11
+11
+16
+test 7 parameters
+14
+test 7 parameters with 7 local variables
+14
+7
+7
+
+Using classB to test now
+testing if statement
+6
+3
+1
+0
+1
+testing mulTyp
+tt
+tf
+ft
+ff
+
+0
+2
+S
+true
+5
+true
+true
+false
